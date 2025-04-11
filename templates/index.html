@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banque des Mémoires UNSTIM</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0066cc">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            background-color: #f0f2f5;
+        }
+        img {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #5f6368;
+            margin-bottom: 20px;
+        }
+        .button {
+            background-color: #1a73e8;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .button:hover {
+            background-color: #1557b0;
+        }
+    </style>
+</head>
+<body>
+    <img src="/static/icons/icon-192x192.png" alt="Logo UNSTIM">
+    <h1>Banque des Mémoires UNSTIM</h1>
+    <p>Cliquez sur le bouton ci-dessous pour accéder à l'application</p>
+    <a href="http://localhost:8501" class="button">Accéder à l'application</a>
+
+    <script>
+        // Redirection automatique vers l'application Streamlit
+        window.location.href = 'http://localhost:8501';
+    </script>
+</body>
+</html> 

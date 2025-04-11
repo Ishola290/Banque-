@@ -1,0 +1,21 @@
+{
+  "name": "Banque des M\u00e9moires UNSTIM",
+  "short_name": "M\u00e9moires UNSTIM",
+  "description": "Plateforme de gestion des m\u00e9moires universitaires de l'UNSTIM",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2C3E50",
+  "icons": [
+    {
+      "src": "assets/unstim.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/unstim.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
