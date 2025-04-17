@@ -38,11 +38,10 @@ Thumbs.db
 # Streamlit
 .streamlit/
 
-# Base de données
-data/memoires_db.sqlite
-
-# Fichiers de mémoires
-data/memoires/
+# Garder les dossiers vides avec leurs .gitkeep
+!data/.gitkeep
+!data/files/.gitkeep
+!data/memoires/.gitkeep
 
 # Fichiers de configuration locaux
 .env
