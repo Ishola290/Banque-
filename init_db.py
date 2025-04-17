@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from werkzeug.security import generate_password_hash
 
 def init_db():
     # Assurez-vous que le dossier data existe
@@ -10,6 +11,19 @@ def init_db():
     c = conn.cursor()
     
     # Création des tables
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS utilisateurs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nom TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        mot_de_passe TEXT NOT NULL,
+        role TEXT NOT NULL,
+        date_naissance TEXT,
+        genre TEXT,
+        telephone TEXT
+    )
+    ''')
+    
     c.execute('''
     CREATE TABLE IF NOT EXISTS entites (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,11 +71,28 @@ def init_db():
     c.execute("INSERT OR IGNORE INTO filieres (nom, entite_id) VALUES ('Informatique', 1)")
     c.execute("INSERT OR IGNORE INTO sessions (annee_universitaire) VALUES ('2023-2024')")
     
+    # Ajout d'un utilisateur administrateur de test
+    admin_password = generate_password_hash('admin123')
+    c.execute("""
+    INSERT OR IGNORE INTO utilisateurs (nom, email, mot_de_passe, role)
+    VALUES (?, ?, ?, ?)
+    """, ('Administrateur', 'admin@unstim.bj', admin_password, 'admin'))
+    
+    # Ajout d'un utilisateur normal de test
+    user_password = generate_password_hash('user123')
+    c.execute("""
+    INSERT OR IGNORE INTO utilisateurs (nom, email, mot_de_passe, role)
+    VALUES (?, ?, ?, ?)
+    """, ('Utilisateur Test', 'user@unstim.bj', user_password, 'user'))
+    
     # Validation des changements
     conn.commit()
     conn.close()
     
     print("Base de données initialisée avec succès!")
+    print("Utilisateurs créés :")
+    print("Admin - Email: admin@unstim.bj, Mot de passe: admin123")
+    print("User  - Email: user@unstim.bj, Mot de passe: user123")
 
 if __name__ == "__main__":
     init_db() 
