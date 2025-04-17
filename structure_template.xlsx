@@ -1,0 +1,24 @@
+# Feuille "entites"
+nom
+Faculté des Sciences et Techniques (FAST)
+École Nationale Supérieure de Génie Mathématique et Modélisation (ENSGMM)
+Institut Universitaire de Technologie (IUT)
+École Nationale Supérieure d'Ingénierie (ENSI)
+
+# Feuille "filieres"
+nom,entite_nom
+Génie Logiciel,École Nationale Supérieure d'Ingénierie (ENSI)
+Réseaux et Télécommunications,École Nationale Supérieure d'Ingénierie (ENSI)
+Mathématiques et Applications,École Nationale Supérieure de Génie Mathématique et Modélisation (ENSGMM)
+Statistiques et Modélisation,École Nationale Supérieure de Génie Mathématique et Modélisation (ENSGMM)
+Physique-Chimie,Faculté des Sciences et Techniques (FAST)
+Sciences de la Vie et de la Terre,Faculté des Sciences et Techniques (FAST)
+Génie Civil,Institut Universitaire de Technologie (IUT)
+Génie Mécanique,Institut Universitaire de Technologie (IUT)
+
+# Feuille "sessions"
+annee_universitaire
+2023-2024
+2022-2023
+2021-2022
+2020-2021 

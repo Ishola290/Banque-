@@ -306,25 +306,15 @@ def check_auth(email, password):
     c = conn.cursor()
     hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
     
-    # Débogage
-    st.write("Tentative de connexion avec:")
-    st.write(f"Email: {email}")
-    st.write(f"Mot de passe hashé: {hashed_pwd}")
-    
-    # Vérifier si l'utilisateur existe
-    c.execute("SELECT email, mot_de_passe FROM utilisateurs WHERE email=?", (email,))
-    user_data = c.fetchone()
-    if user_data:
-        st.write("Utilisateur trouvé:")
-        st.write(f"Email en base: {user_data[0]}")
-        st.write(f"Hash en base: {user_data[1]}")
-    else:
-        st.write("Aucun utilisateur trouvé avec cet email")
-    
-    # Vérification finale
+    # Vérification finale avec une seule requête pour éviter les attaques temporelles
     c.execute("SELECT id, nom, role FROM utilisateurs WHERE email=? AND mot_de_passe=?", 
              (email, hashed_pwd))
     user = c.fetchone()
+    
+    # Journalisation de la tentative de connexion
+    success = user is not None
+    add_log(f"Tentative de connexion {'réussie' if success else 'échouée'} pour {email}")
+    
     conn.close()
     return user
 

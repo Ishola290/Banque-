@@ -5,85 +5,101 @@ from datetime import timedelta
 import time
 import subprocess
 import atexit
-import shutil
-from urllib3.exceptions import MaxRetryError
 import uuid
+from dotenv import load_dotenv
 
 class FileStorage:
-    def __init__(self, max_retries=3, retry_delay=2):
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
-        self.client = None
-        self.bucket_name = "memoires"
-        self.minio_process = None
-        self.minio_path = os.path.join(os.getcwd(), "minio", "minio.exe")
-        self.check_minio_installation()
-        self.start_minio()
+    def __init__(self):
+        # Charger les variables d'environnement
+        load_dotenv()
+        
+        # Détecter l'environnement
+        self.is_production = os.getenv('PRODUCTION', 'false').lower() == 'true'
+        
+        if self.is_production:
+            # Configuration pour la production
+            self.endpoint = os.getenv('MINIO_ENDPOINT')
+            self.access_key = os.getenv('MINIO_ACCESS_KEY')
+            self.secret_key = os.getenv('MINIO_SECRET_KEY')
+            self.bucket_name = os.getenv('MINIO_BUCKET_NAME')
+            self.secure = True
+            
+            if not all([self.endpoint, self.access_key, self.secret_key, self.bucket_name]):
+                raise ValueError("Les configurations MinIO sont manquantes dans les variables d'environnement")
+        else:
+            # Configuration pour le développement local
+            self.endpoint = "localhost:9000"
+            self.access_key = "minioadmin"
+            self.secret_key = "minioadmin"
+            self.bucket_name = "memoires"
+            self.secure = False
+            self.minio_process = None
+            
+            # Démarrer le serveur MinIO local
+            self.start_local_minio()
+        
         self.initialize_client()
         self.ensure_bucket_exists()
     
-    def check_minio_installation(self):
-        """Vérifie si MinIO est installé localement."""
-        if not os.path.exists(self.minio_path):
-            raise RuntimeError(
-                "MinIO n'est pas installé localement.\n"
-                "Pour installer MinIO :\n"
-                "1. Téléchargez l'exécutable depuis https://min.io/download#/windows\n"
-                "2. Extrayez le fichier minio.exe\n"
-                "3. Placez minio.exe dans le dossier 'minio' de votre projet"
-            )
+    def start_local_minio(self):
+        """Démarre le serveur MinIO local en développement."""
+        if not self.is_production:
+            try:
+                # Créer le dossier data s'il n'existe pas
+                data_dir = os.path.join(os.getcwd(), "data")
+                os.makedirs(data_dir, exist_ok=True)
+                
+                # Chemin vers minio.exe
+                minio_path = os.path.join(os.getcwd(), "minio", "minio.exe")
+                
+                if not os.path.exists(minio_path):
+                    raise RuntimeError(
+                        "MinIO n'est pas installé localement.\n"
+                        "Pour installer MinIO :\n"
+                        "1. Téléchargez l'exécutable depuis https://min.io/download#/windows\n"
+                        "2. Créez un dossier 'minio' dans votre projet\n"
+                        "3. Placez minio.exe dans le dossier 'minio'"
+                    )
+                
+                # Démarrer MinIO
+                self.minio_process = subprocess.Popen(
+                    [minio_path, "server", data_dir],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+                
+                # Attendre que MinIO soit prêt
+                time.sleep(2)
+                
+                # Enregistrer la fonction de nettoyage
+                atexit.register(self.stop_local_minio)
+                
+            except Exception as e:
+                print(f"Erreur lors du démarrage de MinIO local: {e}")
+                raise
     
-    def start_minio(self):
-        """Démarre le serveur MinIO en arrière-plan."""
-        try:
-            # Créer le dossier data s'il n'existe pas
-            data_dir = os.path.join(os.getcwd(), "data")
-            os.makedirs(data_dir, exist_ok=True)
-            
-            # Démarrer MinIO
-            self.minio_process = subprocess.Popen(
-                [self.minio_path, "server", data_dir],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                creationflags=subprocess.CREATE_NO_WINDOW  # Pour Windows
-            )
-            
-            # Attendre que MinIO soit prêt
-            time.sleep(2)
-            
-            # Enregistrer la fonction de nettoyage
-            atexit.register(self.stop_minio)
-            
-        except Exception as e:
-            print(f"Erreur lors du démarrage de MinIO: {e}")
-            raise
-    
-    def stop_minio(self):
-        """Arrête le serveur MinIO."""
-        if self.minio_process:
+    def stop_local_minio(self):
+        """Arrête le serveur MinIO local."""
+        if not self.is_production and self.minio_process:
             self.minio_process.terminate()
             self.minio_process.wait()
     
     def initialize_client(self):
-        """Initialise le client MinIO avec gestion des erreurs."""
-        for attempt in range(self.max_retries):
-            try:
-                self.client = Minio(
-                    "localhost:9000",
-                    access_key="minioadmin",
-                    secret_key="minioadmin",
-                    secure=False
-                )
-                # Tester la connexion
-                self.client.list_buckets()
-                print("Connexion à MinIO établie avec succès")
-                return
-            except Exception as e:
-                print(f"Tentative {attempt + 1}/{self.max_retries} échouée: {str(e)}")
-                if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay)
-                else:
-                    raise Exception("Impossible de se connecter à MinIO après plusieurs tentatives")
+        """Initialise le client MinIO."""
+        try:
+            self.client = Minio(
+                self.endpoint,
+                access_key=self.access_key,
+                secret_key=self.secret_key,
+                secure=self.secure
+            )
+            # Tester la connexion
+            self.client.list_buckets()
+            env_type = "production" if self.is_production else "développement"
+            print(f"Connexion à MinIO ({env_type}) établie avec succès")
+        except Exception as e:
+            raise Exception(f"Impossible de se connecter à MinIO: {str(e)}")
     
     def ensure_bucket_exists(self):
         """S'assure que le bucket existe, le crée si nécessaire."""
@@ -142,7 +158,8 @@ class FileStorage:
                 data = self.client.get_object(self.bucket_name, object_name)
                 return data.read()
             finally:
-                data.close()
+                if 'data' in locals():
+                    data.close()
                 
         except Exception as e:
             print(f"Erreur lors de la récupération du fichier {file_path}: {str(e)}")
@@ -151,11 +168,11 @@ class FileStorage:
     def delete_file(self, file_path):
         """Supprime un fichier de MinIO."""
         try:
-            if not self.client:
-                self.initialize_client()
+            if not file_path.startswith("minio://"):
+                raise ValueError("Le chemin du fichier doit commencer par 'minio://'")
                 
-            filename = file_path.replace(f"minio://{self.bucket_name}/", "")
-            self.client.remove_object(self.bucket_name, filename)
+            object_name = file_path.replace("minio://", "")
+            self.client.remove_object(self.bucket_name, object_name)
             return True
         except Exception as e:
             print(f"Erreur lors de la suppression du fichier: {e}")
@@ -164,13 +181,13 @@ class FileStorage:
     def get_download_url(self, file_path, expires=3600):
         """Génère une URL présignée pour le téléchargement."""
         try:
-            if not self.client:
-                self.initialize_client()
+            if not file_path.startswith("minio://"):
+                raise ValueError("Le chemin du fichier doit commencer par 'minio://'")
                 
-            filename = file_path.replace(f"minio://{self.bucket_name}/", "")
+            object_name = file_path.replace("minio://", "")
             url = self.client.presigned_get_object(
                 self.bucket_name,
-                filename,
+                object_name,
                 expires=timedelta(seconds=expires)
             )
             return url
