@@ -1,25 +1,39 @@
-# Python
+# Environnement et configuration
+.env
+.env.local
+*.env
+
+# Base de données
+*.sqlite
+*.db
+
+# Dossiers Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
 .Python
 env/
-build/
-develop-eggs/
-dist/
+venv/
+.env/
+.venv/
+
+# Dossiers de données
+data/
+uploads/
 downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # Streamlit
 .streamlit/
@@ -30,14 +44,15 @@ data/memoires_db.sqlite
 # Fichiers de mémoires
 data/memoires/
 
-# Environnement virtuel
-venv/
-ENV/
+# Fichiers de configuration locaux
+.env
+.env.local
+*.sqlite
+*.db
 
-# IDE
-.vscode/
-.idea/
+# Dossiers de données
+data/
+minio-data/
 
-# Système
-.DS_Store
-Thumbs.db 
+# Fichiers de log
+*.log 
