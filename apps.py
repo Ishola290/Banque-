@@ -9,6 +9,7 @@ from datetime import datetime
 from io import BytesIO
 import time
 from storage import FileStorage
+from database import db
 
 # Configuration du thème global
 st.markdown("""
@@ -193,25 +194,26 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Créer la table utilisateurs si elle n'existe pas (sans la supprimer)
+    # Créer la table utilisateurs si elle n'existe pas
     c.execute('''
     CREATE TABLE IF NOT EXISTS utilisateurs (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         nom TEXT NOT NULL,
         prenom TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         mot_de_passe TEXT NOT NULL,
-        role TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
         date_naissance TEXT,
         genre TEXT,
-        telephone TEXT
+        telephone TEXT,
+        date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     ''')
     
     # Création de la table entites
     c.execute('''
     CREATE TABLE IF NOT EXISTS entites (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         nom TEXT NOT NULL UNIQUE
     )
     ''')
@@ -219,7 +221,7 @@ def init_db():
     # Création de la table filieres
     c.execute('''
     CREATE TABLE IF NOT EXISTS filieres (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         nom TEXT NOT NULL,
         entite_id INTEGER NOT NULL,
         FOREIGN KEY (entite_id) REFERENCES entites (id),
@@ -230,7 +232,7 @@ def init_db():
     # Création de la table sessions
     c.execute('''
     CREATE TABLE IF NOT EXISTS sessions (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         annee_universitaire TEXT NOT NULL UNIQUE
     )
     ''')
@@ -238,17 +240,17 @@ def init_db():
     # Création de la table memoires
     c.execute('''
     CREATE TABLE IF NOT EXISTS memoires (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         titre TEXT NOT NULL,
         auteurs TEXT NOT NULL,
         encadreur TEXT NOT NULL,
         resume TEXT,
-        fichier_pdf TEXT NOT NULL,
+        fichier_url TEXT NOT NULL,
         tags TEXT,
         filiere_id INTEGER NOT NULL,
         session_id INTEGER NOT NULL,
         version TEXT,
-        date_ajout TEXT NOT NULL,
+        date_ajout TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (filiere_id) REFERENCES filieres (id),
         FOREIGN KEY (session_id) REFERENCES sessions (id)
     )
@@ -257,35 +259,15 @@ def init_db():
     # Création de la table favoris
     c.execute('''
     CREATE TABLE IF NOT EXISTS favoris (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         memoire_id INTEGER NOT NULL,
+        date_ajout TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES utilisateurs (id),
         FOREIGN KEY (memoire_id) REFERENCES memoires (id),
         UNIQUE(user_id, memoire_id)
     )
     ''')
-    
-    # Création de la table logs
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS logs (
-        id INTEGER PRIMARY KEY,
-        action TEXT NOT NULL,
-        user_id INTEGER,
-        date TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES utilisateurs (id)
-    )
-    ''')
-    
-    # Vérification si un admin existe déjà, sinon on en crée un par défaut
-    c.execute("SELECT * FROM utilisateurs WHERE role='admin' LIMIT 1")
-    if not c.fetchone():
-        # Création d'un admin par défaut (admin@universite.com / Admin@0128)
-        hashed_pwd = hashlib.sha256("Admin@0128".encode()).hexdigest()
-        c.execute("""
-        INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, role) 
-        VALUES (?, ?, ?, ?, ?)
-        """, ("Administrateur", "System", "admin@universite.com", hashed_pwd, "admin"))
     
     conn.commit()
     conn.close()
@@ -304,19 +286,30 @@ def add_log(action, user_id=None):
 def check_auth(email, password):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
     
-    # Vérification finale avec une seule requête pour éviter les attaques temporelles
-    c.execute("SELECT id, nom, role FROM utilisateurs WHERE email=? AND mot_de_passe=?", 
-             (email, hashed_pwd))
-    user = c.fetchone()
-    
-    # Journalisation de la tentative de connexion
-    success = user is not None
-    add_log(f"Tentative de connexion {'réussie' if success else 'échouée'} pour {email}")
-    
-    conn.close()
-    return user
+    try:
+        # Hash du mot de passe avec la même méthode que lors de l'inscription
+        hashed_pwd = hashlib.sha256(password.encode()).hexdigest()
+        
+        # Vérification de l'utilisateur
+        c.execute("""
+            SELECT id, nom || ' ' || prenom as nom_complet, role 
+            FROM utilisateurs 
+            WHERE email=? AND mot_de_passe=?
+        """, (email, hashed_pwd))
+        
+        user = c.fetchone()
+        
+        # Journalisation de la tentative de connexion
+        success = user is not None
+        add_log(f"Tentative de connexion {'réussie' if success else 'échouée'} pour {email}")
+        
+        return user
+    except Exception as e:
+        print(f"Erreur lors de l'authentification : {e}")
+        return None
+    finally:
+        conn.close()
 
 # Fonction pour ajouter une entité
 def add_entity(nom):
@@ -468,7 +461,7 @@ def save_pdf_content(memoire_id, pdf_content):
         conn.close()
 
 # Fonction pour ajouter un mémoire
-def add_memoire(titre, auteurs, encadreur, resume, fichier_pdf, tags, filiere_id, session_id, version):
+def add_memoire(titre, auteurs, encadreur, resume, fichier_url, tags, filiere_id, session_id, version):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
@@ -477,9 +470,9 @@ def add_memoire(titre, auteurs, encadreur, resume, fichier_pdf, tags, filiere_id
         # Insérer le mémoire
         c.execute("""
         INSERT INTO memoires 
-        (titre, auteurs, encadreur, resume, fichier_pdf, tags, filiere_id, session_id, version, date_ajout) 
+        (titre, auteurs, encadreur, resume, fichier_url, tags, filiere_id, session_id, version, date_ajout) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (titre, auteurs, encadreur, resume, fichier_pdf, tags, filiere_id, session_id, version, date_now))
+        """, (titre, auteurs, encadreur, resume, fichier_url, tags, filiere_id, session_id, version, date_now))
         
         conn.commit()
         result = True, "Mémoire ajouté avec succès."
@@ -492,7 +485,7 @@ def add_memoire(titre, auteurs, encadreur, resume, fichier_pdf, tags, filiere_id
 def get_all_memoires():
     conn = sqlite3.connect(DB_PATH)
     query = """
-    SELECT m.id, m.titre, m.auteurs, m.encadreur, m.resume, m.fichier_pdf, m.tags, 
+    SELECT m.id, m.titre, m.auteurs, m.encadreur, m.resume, m.fichier_url, m.tags, 
            f.nom as filiere_nom, s.annee_universitaire, m.version, m.date_ajout,
            e.nom as entite_nom
     FROM memoires m
@@ -501,9 +494,14 @@ def get_all_memoires():
     JOIN entites e ON f.entite_id = e.id
     ORDER BY m.date_ajout DESC
     """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
-    return df
+    try:
+        df = pd.read_sql_query(query, conn)
+        return df
+    except Exception as e:
+        print(f"Erreur lors de la récupération des mémoires : {e}")
+        return pd.DataFrame()  # Retourne un DataFrame vide en cas d'erreur
+    finally:
+        conn.close()
 
 # Fonction pour supprimer un mémoire
 def delete_memoire(memoire_id):
@@ -512,7 +510,7 @@ def delete_memoire(memoire_id):
     
     try:
         # Vérifier si le mémoire existe
-        c.execute("SELECT id, fichier_pdf FROM memoires WHERE id = ?", (memoire_id,))
+        c.execute("SELECT id, fichier_url FROM memoires WHERE id = ?", (memoire_id,))
         result = c.fetchone()
         
         if result is None:
@@ -528,7 +526,7 @@ def delete_memoire(memoire_id):
         c.execute("DELETE FROM memoires WHERE id = ?", (memoire_id,))
         
         # Supprimer le fichier PDF si nécessaire
-        if file_path and file_path.startswith("minio://"):
+        if file_path and file_path.startswith("local://"):
             try:
                 storage.delete_file(file_path)
             except Exception as e:
@@ -575,7 +573,7 @@ def search_memoires(query, entity=None, filiere=None, session=None):
     
     # Construire la requête SQL
     sql = """
-    SELECT m.id, m.titre, m.auteurs, m.encadreur, m.resume, m.fichier_pdf, m.tags, 
+    SELECT m.id, m.titre, m.auteurs, m.encadreur, m.resume, m.fichier_url, m.tags, 
            f.nom as filiere_nom, s.annee_universitaire, m.version, m.date_ajout,
            e.nom as entite_nom
     FROM memoires m
@@ -604,7 +602,7 @@ def get_filieres_by_entity(entity_id):
 def get_memoire_details(memoire_id):
     conn = sqlite3.connect(DB_PATH)
     query = """
-    SELECT m.id, m.titre, m.auteurs, m.encadreur, m.resume, m.fichier_pdf, m.tags, 
+    SELECT m.id, m.titre, m.auteurs, m.encadreur, m.resume, m.fichier_url, m.tags, 
            f.nom as filiere_nom, s.annee_universitaire, m.version, m.date_ajout,
            e.nom as entite_nom, f.id as filiere_id, s.id as session_id
     FROM memoires m
@@ -620,16 +618,16 @@ def get_memoire_details(memoire_id):
     return None
 
 # Fonction pour mettre à jour un mémoire
-def update_memoire(memoire_id, titre, auteurs, encadreur, resume, fichier_pdf, tags, filiere_id, session_id, version):
+def update_memoire(memoire_id, titre, auteurs, encadreur, resume, fichier_url, tags, filiere_id, session_id, version):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
-        if fichier_pdf:  # Nouveau fichier PDF
+        if fichier_url:  # Nouveau fichier PDF
             c.execute("""
             UPDATE memoires 
-            SET titre=?, auteurs=?, encadreur=?, resume=?, fichier_pdf=?, tags=?, filiere_id=?, session_id=?, version=?
+            SET titre=?, auteurs=?, encadreur=?, resume=?, fichier_url=?, tags=?, filiere_id=?, session_id=?, version=?
             WHERE id=?
-            """, (titre, auteurs, encadreur, resume, fichier_pdf, tags, filiere_id, session_id, version, memoire_id))
+            """, (titre, auteurs, encadreur, resume, fichier_url, tags, filiere_id, session_id, version, memoire_id))
         else:  # Pas de nouveau fichier PDF
             c.execute("""
             UPDATE memoires 
@@ -688,15 +686,15 @@ def get_statistics():
 def display_pdf(file_path):
     """Affiche un PDF dans l'interface."""
     try:
-        if file_path.startswith("minio://"):
-            # Récupérer le contenu du fichier depuis MinIO
-            content = storage.get_file(file_path)
-            if content:
+        if file_path.startswith("local://"):
+            # Récupérer le contenu du fichier depuis le stockage local
+            pdf_content = storage.get_file(file_path)
+            if pdf_content:
                 # Créer un conteneur pour le PDF
                 pdf_container = st.empty()
                 
                 # Encoder le contenu en base64
-                b64 = base64.b64encode(content).decode('utf-8')
+                b64 = base64.b64encode(pdf_content).decode('utf-8')
                 
                 # Créer l'iframe avec le PDF
                 pdf_display = f'''
@@ -714,9 +712,9 @@ def display_pdf(file_path):
                 # Afficher le PDF
                 pdf_container.markdown(pdf_display, unsafe_allow_html=True)
             else:
-                st.error("Impossible de récupérer le fichier PDF. Veuillez vérifier que le fichier existe dans MinIO.")
+                st.error("Impossible de récupérer le fichier PDF. Veuillez vérifier que le fichier existe.")
         else:
-            st.error("Format de fichier non supporté. Le chemin doit commencer par 'minio://'")
+            st.error("Format de fichier non supporté. Le chemin doit commencer par 'local://'")
     except Exception as e:
         st.error(f"Erreur lors de l'affichage du PDF: {str(e)}")
 
@@ -724,16 +722,16 @@ def display_pdf(file_path):
 def get_download_link(file_path, label):
     """Crée un lien de téléchargement pour un fichier PDF."""
     try:
-        if file_path.startswith("minio://"):
-            # Récupérer le contenu du fichier depuis MinIO
-            content = storage.get_file(file_path)
-            if content:
+        if file_path.startswith("local://"):
+            # Récupérer le contenu du fichier depuis le stockage local
+            file_content = storage.get_file(file_path)
+            if file_content:
                 # Extraire le nom du fichier original
-                filename = os.path.basename(file_path.replace("minio://", ""))
+                filename = os.path.basename(file_path.replace("local://", ""))
                 # Utiliser le composant de téléchargement natif de Streamlit
                 return st.download_button(
                     label=label,
-                    data=content,
+                    data=file_content,
                     file_name=filename,
                     mime="application/pdf"
                 )
@@ -816,7 +814,7 @@ def search_in_pdf_content(query):
     
     try:
         sql = """
-        SELECT DISTINCT m.id, m.titre, m.auteurs, m.encadreur, m.resume, m.fichier_pdf, 
+        SELECT DISTINCT m.id, m.titre, m.auteurs, m.encadreur, m.resume, m.fichier_url, 
                m.tags, f.nom as filiere_nom, s.annee_universitaire, m.version, 
                m.date_ajout, e.nom as entite_nom,
                pc.page_num,
@@ -930,7 +928,7 @@ def bulk_import_memoires(metadata_file, pdf_folder):
                 date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 c.execute("""
                 INSERT INTO memoires 
-                (titre, auteurs, encadreur, resume, fichier_pdf, tags, filiere_id, session_id, version, date_ajout)
+                (titre, auteurs, encadreur, resume, fichier_url, tags, filiere_id, session_id, version, date_ajout)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     row['titre'],
@@ -1068,7 +1066,7 @@ def bulk_import_structure_and_memoires(structure_file, metadata_file, pdf_folder
                 date_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 c.execute("""
                 INSERT INTO memoires 
-                (titre, auteurs, encadreur, resume, fichier_pdf, tags, filiere_id, session_id, version, date_ajout)
+                (titre, auteurs, encadreur, resume, fichier_url, tags, filiere_id, session_id, version, date_ajout)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     row['titre'],
@@ -1477,13 +1475,13 @@ def show_memoire_details(memoire_id):
     
     # Afficher les actions
     st.subheader("Actions")
-    if memoire['fichier_pdf'].startswith("minio://"):
+    if memoire['fichier_url'].startswith("local://"):
         action_col1, action_col2 = st.columns(2)
         with action_col1:
-            st.markdown(get_download_link(memoire['fichier_pdf'], "📥 Télécharger le PDF"), unsafe_allow_html=True)
+            st.markdown(get_download_link(memoire['fichier_url'], "📥 Télécharger le PDF"), unsafe_allow_html=True)
         with action_col2:
             if st.button("📄 Consulter en ligne"):
-                display_pdf(memoire['fichier_pdf'])
+                display_pdf(memoire['fichier_url'])
 
 def show_search_page():
     st.header("🔍 Recherche de Mémoires")
@@ -1562,13 +1560,13 @@ def show_search_page():
                             
                             # Colonne pour le téléchargement
                             with action_cols[0]:
-                                if memoire['fichier_pdf'].startswith("minio://"):
-                                    content = storage.get_file(memoire['fichier_pdf'])
-                                    if content:
-                                        filename = os.path.basename(memoire['fichier_pdf'].replace("minio://", ""))
+                                if memoire['fichier_url'].startswith("local://"):
+                                    file_content = storage.get_file(memoire['fichier_url'])
+                                    if file_content:
+                                        filename = os.path.basename(memoire['fichier_url'].replace("local://", ""))
                                         st.download_button(
                                             "📥 Télécharger le PDF",
-                                            data=content,
+                                            data=file_content,
                                             file_name=filename,
                                             mime="application/pdf",
                                             key=f"download_{memoire['id']}"
@@ -1581,7 +1579,7 @@ def show_search_page():
                             
                             # Afficher le PDF si demandé
                             if st.session_state.get(f"show_pdf_{memoire['id']}", False):
-                                display_pdf(memoire['fichier_pdf'])
+                                display_pdf(memoire['fichier_url'])
 
 def show_statistics_page():
     st.header("📊 Statistiques")
@@ -1864,7 +1862,7 @@ def show_memoires_management():
                         version = st.text_input("Version", value=memoire['version'])
                     
                     # Upload d'un nouveau PDF (optionnel)
-                    st.write("PDF actuel :", memoire['fichier_pdf'])
+                    st.write("PDF actuel :", memoire['fichier_url'])
                     uploaded_pdf = st.file_uploader("Nouveau PDF (optionnel)", type=['pdf'])
                     
                     col1, col2 = st.columns(2)
@@ -2262,8 +2260,8 @@ def show_memoires_management():
                         
                         # Téléchargement
                         with action_col1:
-                            if memoire['fichier_pdf'].startswith("minio://"):
-                                st.markdown(get_download_link(memoire['fichier_pdf'], "📥 Télécharger le PDF"), unsafe_allow_html=True)
+                            if memoire['fichier_url'].startswith("local://"):
+                                st.markdown(get_download_link(memoire['fichier_url'], "📥 Télécharger le PDF"), unsafe_allow_html=True)
                         
                         # Modification
                         with action_col2:

@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from werkzeug.security import generate_password_hash
+import hashlib
 
 def init_db():
     # Assurez-vous que le dossier data existe
@@ -55,7 +55,7 @@ def init_db():
         auteurs TEXT NOT NULL,
         encadreur TEXT NOT NULL,
         resume TEXT,
-        fichier_pdf TEXT NOT NULL,
+        fichier_url TEXT NOT NULL,
         tags TEXT,
         filiere_id INTEGER NOT NULL,
         session_id INTEGER NOT NULL,
@@ -66,24 +66,39 @@ def init_db():
     )
     ''')
     
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT NOT NULL,
+        user_id INTEGER,
+        date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES utilisateurs (id)
+    )
+    ''')
+    
     # Ajout de quelques données de test
     c.execute("INSERT OR IGNORE INTO entites (nom) VALUES ('UNSTIM')")
     c.execute("INSERT OR IGNORE INTO filieres (nom, entite_id) VALUES ('Informatique', 1)")
     c.execute("INSERT OR IGNORE INTO sessions (annee_universitaire) VALUES ('2023-2024')")
     
     # Ajout d'un utilisateur administrateur de test
-    admin_password = generate_password_hash('admin123')
+    admin_password = hashlib.sha256('Admin@0128'.encode()).hexdigest()
     c.execute("""
     INSERT OR IGNORE INTO utilisateurs (nom, email, mot_de_passe, role)
     VALUES (?, ?, ?, ?)
-    """, ('Administrateur', 'admin@unstim.bj', admin_password, 'admin'))
+    """, ('Administrateur', 'admin@universite.com', admin_password, 'admin'))
     
     # Ajout d'un utilisateur normal de test
-    user_password = generate_password_hash('user123')
+    user_password = hashlib.sha256('user123'.encode()).hexdigest()
     c.execute("""
     INSERT OR IGNORE INTO utilisateurs (nom, email, mot_de_passe, role)
     VALUES (?, ?, ?, ?)
     """, ('Utilisateur Test', 'user@unstim.bj', user_password, 'user'))
+    
+    # Ajout d'un log initial
+    c.execute("""
+    INSERT INTO logs (action) VALUES ('Initialisation de la base de données')
+    """)
     
     # Validation des changements
     conn.commit()
@@ -91,7 +106,7 @@ def init_db():
     
     print("Base de données initialisée avec succès!")
     print("Utilisateurs créés :")
-    print("Admin - Email: admin@unstim.bj, Mot de passe: admin123")
+    print("Admin - Email: admin@universite.com, Mot de passe: Admin@0128")
     print("User  - Email: user@unstim.bj, Mot de passe: user123")
 
 if __name__ == "__main__":
