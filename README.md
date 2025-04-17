@@ -1,37 +1,39 @@
-# Banque des Mémoires UNSTIM
+# Gestionnaire de Fichiers Local avec Streamlit
 
-Application de gestion des mémoires universitaires pour l'UNSTIM.
+Une application web simple pour gérer des fichiers en local, construite avec Streamlit.
 
 ## Fonctionnalités
 
-- Gestion des mémoires universitaires
-- Recherche avancée
-- Statistiques
-- Gestion des entités et filières
-- Gestion des sessions
-- Journal d'activité
+- Upload de fichiers
+- Visualisation de la liste des fichiers stockés
+- Suppression de fichiers
+- Stockage local sécurisé
 
 ## Installation
 
-1. Cloner le dépôt
-2. Installer les dépendances :
+1. Clonez ce dépôt :
+```bash
+git clone <votre-url-github>
+```
+
+2. Installez les dépendances :
 ```bash
 pip install -r requirements.txt
 ```
 
-## Lancement
+## Utilisation
+
+Pour lancer l'application :
 
 ```bash
-streamlit run apps.py
+streamlit run streamlit_app.py
 ```
 
-## Structure des dossiers
+L'application sera accessible à l'adresse : http://localhost:8501
 
-- `apps.py` : Application principale
-- `data/` : Dossier contenant la base de données et les mémoires
-- `static/` : Dossier contenant les ressources statiques (icônes, manifeste)
+## Structure du projet
 
-## Auteurs
-
-- B. Zamane SOULEMANE
-- A. Elisé LOKOSSOU 
+- `streamlit_app.py` : Application principale Streamlit
+- `local_storage.py` : Gestionnaire de stockage local
+- `requirements.txt` : Dépendances du projet
+- `data/files/` : Dossier de stockage des fichiers (créé automatiquement) 

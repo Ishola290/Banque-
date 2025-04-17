@@ -1,5 +1,9 @@
 streamlit==1.31.1
 pandas==2.2.0
 minio==7.2.3
-python-dotenv==1.0.1
+python-dotenv==1.0.0
 openpyxl==3.1.2
+MINIO_ENDPOINT=votre_endpoint_minio
+MINIO_ACCESS_KEY=votre_access_key
+MINIO_SECRET_KEY=votre_secret_key
+MINIO_BUCKET_NAME=votre_bucket_name

@@ -55,4 +55,10 @@ data/
 minio-data/
 
 # Fichiers de log
-*.log 
+*.log
+
+# Exclusions supplémentaires
+data/files/*
+.idea/
+venv/
+*.pyc 
