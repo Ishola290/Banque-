@@ -60,4 +60,25 @@ minio-data/
 data/files/*
 .idea/
 venv/
-*.pyc 
+*.pyc
+
+# Ne pas ignorer les dossiers importants
+!assets/
+!data/
+!static/
+!templates/
+
+# Mais ignorer les fichiers temporaires dans ces dossiers
+data/**/*.sqlite
+data/**/*.db
+data/**/*.pyc
+data/**/__pycache__/
+
+# Minio
+.minio.sys/
+data/.minio.sys/
+minio/
+
+# Garder les dossiers vides
+!data/files/
+!data/memoires/ 
